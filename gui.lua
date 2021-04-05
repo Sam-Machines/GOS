@@ -3,6 +3,8 @@ os.loadAPI(shell.resolve("apis/windows.lua"))
     args = {...}
     version = "0.0.1 alpha"
     running = true
+    accses = false
+    currentUser = "Guest"
     w, h = term.getSize()
 
     --Running programs
@@ -35,6 +37,40 @@ os.loadAPI(shell.resolve("apis/windows.lua"))
             coroutine.yield()
         end
     end, 28, 10, 20, 10, "Tasks")
+
+    P_accounts = windows.programs.new(function()
+        while true do
+            term.setBackgroundColor(colors.white)
+            term.setTextColor(colors.black)
+            term.clear()
+            term.setCursorPos(1, 1) -- This places the print position to the top of screen
+
+            username = {"admin"}  -- Here you need to define all usernames available
+            password = {"admin"}  -- Here you define what password each user has, remember to put user1's password in the first row and so on.
+
+            write("Username: ")
+            user = read()
+
+            write("Password: ")
+            pass = read('*') -- This prevents people from reading the password as you put it in
+
+            for i=1, #username do -- Starts a loop
+                if user == username[i] and pass == password[i] then
+                    access = true
+                    currentUser = user
+                    return
+                end
+            end
+
+            if not access then
+                print("Incorrect username and password combination")
+                sleep(2)
+            end
+
+
+            coroutine.yield()
+        end
+    end, 28, 10, 20, 10, "Account Login")
 
     --Images
     _desktop = paintutils.loadImage(shell.resolve("resources/.backgrounds/desktop1"))
@@ -78,21 +114,16 @@ os.loadAPI(shell.resolve("apis/windows.lua"))
 
             term.setCursorBlink(false)
             paintutils.drawFilledBox(1, 2, math.ceil(w/3), math.ceil(h/2+5-1), colors.lightBlue)
+            
+            term.setCursorPos(1, 3)
+            term.setTextColor(colors.white)
+            term.write('Loged in as '..currentUser)
+
             powerX, powerY = math.ceil(w/3-1), math.ceil(h/2+5-2) 
             term.setCursorPos(powerX, powerY)
             term.setTextColor(colors.white)
             term.setBackgroundColor(colors.red)
             term.write("X")
-        else
-
-            for i = 1, #programs do
-                if programs[i].selected then
-                    term.setTextColor(programs[i].blinkCol)
-                    term.setCursorPos(programs[i].blinkX, programs[i].blinkY)
-                    term.setCursorBlink(programs[i].blinking)
-                end
-            end
-
         end
     end
 
@@ -122,10 +153,19 @@ os.loadAPI(shell.resolve("apis/windows.lua"))
         term.setBackgroundColour(colours.black)
         term.setTextColor(colours.white)
         term.write(formattedTime)
+
+        for i = 1, #programs do
+            if programs[i].selected then
+                term.setTextColor(programs[i].blinkCol)
+                term.setCursorPos(programs[i].blinkX, programs[i].blinkY)
+                term.setCursorBlink(programs[i].blinking)
+            end
+        end
     end
 
-    function drawRightClick(x, y)
+    function drawRightClick()
         w, h = term.getSize()
+        x,y = rightX, rightY
         if isRightClick == true then
             paintutils.drawFilledBox(x, y, math.ceil(x+w/3)-4, math.ceil(y+h/2+5)-4, colors.white)
             term.setCursorPos(x+1, y)
@@ -147,12 +187,20 @@ os.loadAPI(shell.resolve("apis/windows.lua"))
     --Runtime
     local function run()
         while running do
+            drawTaskbar()
             event, p1, p2, p3, p4, p5 = os.pullEventRaw()
             w, h = term.getSize()
 
 
             if programs ~= nil and not isStartMenu then
                 windows.programs.update(programs, event, p1, p2, p3)
+            end
+            for i = 1, #programs do
+                if programs[i].selected then
+                    term.setTextColor(programs[i].blinkCol)
+                    term.setCursorPos(programs[i].blinkX, programs[i].blinkY)
+                    term.setCursorBlink(programs[i].blinking)
+                end
             end               
                                         
             if event == "mouse_click" then
@@ -202,7 +250,7 @@ os.loadAPI(shell.resolve("apis/windows.lua"))
             if event ~= 'char' then
                 drawDesktop()
                 drawTaskbar()
-                drawRightClick(x,y)
+                drawRightClick()
             end
 
             windows.programs.update(programs, "", "", "", "")
@@ -210,11 +258,43 @@ os.loadAPI(shell.resolve("apis/windows.lua"))
         end
     end
     
+    local function account()
+        programs = {}
+        table.insert(programs, P_accounts)
+        windows.programs.update(programs, "", "", "", "")
+        while not accses do
+
+            event, p1, p2, p3, p4, p5 = os.pullEventRaw()
+            w,h = term.getSize()
+            paintutils.drawFilledBox(1,1,w,h,colors.cyan)
+
+            for i = 1, #programs do
+                if programs[i].selected then
+                    term.setTextColor(programs[i].blinkCol)
+                    term.setCursorPos(programs[i].blinkX, programs[i].blinkY)
+                    term.setCursorBlink(programs[i].blinking)
+                end
+            end
+
+            windows.programs.update(programs, event, p1, p2, p3)
+            if #programs == 0 then
+                accses = false
+                return
+            end
+        end
+    end
+    local function load()
+        programs = {}
+        drawDesktop()
+        drawTaskbar()
+        run()
+    end
+
     local function init()
-       drawDesktop()
-       drawTaskbar()
-       run()
-       clear(colors.black)
+        parallel.waitForAll(account)
+        load()
+
+        clear(colors.black)
     end
 --Main
     -- Run
